@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 with open("XDATCAR.txt") as f:
@@ -15,6 +16,24 @@ n_timesteps = int((len(data) - 7) / (n_atoms + 1))
 T = []
 for i in range(1, n_timesteps):
     velocities = [0 for _ in range(n_atoms)]
+    rads = []
+    main_point = data[7 + i * (n_atoms + 1) + 1].strip().split()
+    for k in range(1, n_atoms):
+        tmp_rad = 0
+        point = data[7 + i * (n_atoms + 1) + 1 + k].strip().split()
+        for index in range(3):
+            tmp_rad += (float(main_point[index]) - float(point[index])) ** 2
+        rads.append(tmp_rad ** 0.5)
+    dr = max(rads) / 100
+    rs = [dr * i for i in range(101)]
+    ns = [0 for _ in range(101)]
+    for q in rads:
+        ns[int(q / dr)] += 1
+    ns = np.array(ns) / n_atoms
+    if i == 1:
+        plt.plot(np.array(rs) * cell_size[0], ns)
+        plt.show()
+        
     for k in range(n_atoms):
         first_index = 7 + (i - 1) * (n_atoms + 1) + 1 + k
         second_index = 7 + i * (n_atoms + 1) + 1 + k
