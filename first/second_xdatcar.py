@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 with open("XDATCAR.txt") as f:
     data = f.readlines()
 title = data[:7]
@@ -11,29 +10,35 @@ timestep = 2e-15
 n_atoms = int(title[6])
 mu = 55.8 / 1000
 R = 8.31
+rho = 7800
+gr_discrete = 100
 
 n_timesteps = int((len(data) - 7) / (n_atoms + 1))
 T = []
 for i in range(1, n_timesteps):
     velocities = [0 for _ in range(n_atoms)]
-    rads = []
-    main_point = data[7 + i * (n_atoms + 1) + 1].strip().split()
-    for k in range(1, n_atoms):
-        tmp_rad = 0
-        point = data[7 + i * (n_atoms + 1) + 1 + k].strip().split()
-        for index in range(3):
-            tmp_rad += (float(main_point[index]) - float(point[index])) ** 2
-        rads.append(tmp_rad ** 0.5)
-    dr = max(rads) / 100
-    rs = [dr * i for i in range(101)]
-    ns = [0 for _ in range(101)]
-    for q in rads:
-        ns[int(q / dr)] += 1
-    ns = np.array(ns) / n_atoms
-    if i == 1:
-        plt.plot(np.array(rs) * cell_size[0], ns)
+    if i == 1 or i == n_timesteps - 1:
+        rads = []
+        for k in range(n_atoms - 1):
+            point1 = data[7 + i * (n_atoms + 1) + 1 + k].strip().split()
+            for q in range(k + 1, n_atoms):
+                point2 = data[7 + i * (n_atoms + 1) + 1 + q].strip().split()
+                tmp_rad = 0
+                for index in range(3):
+                    tmp_rad += (float(point1[index]) - float(point2[index])) ** 2
+                rads.append(tmp_rad ** 0.5)
+
+        dr = 2 / gr_discrete
+        rs = [dr * i for i in range(gr_discrete + 1)]
+        ns = [0 for _ in range(gr_discrete + 1)]
+        for q in rads:
+            ns[int(q / dr)] += 2
+        ns = np.array(ns)
+        ns = [ns[i] / 4 / np.pi / rs[i] ** 2 / dr / rho if rs[i] != 0 else ns[i] / 4 / np.pi / dr / rho for i in range(len(ns))]
+        # plt.plot(np.array(rs) * cell_size[0], ns)
+        plt.plot(np.array(rs), ns)
         plt.show()
-        
+
     for k in range(n_atoms):
         first_index = 7 + (i - 1) * (n_atoms + 1) + 1 + k
         second_index = 7 + i * (n_atoms + 1) + 1 + k
