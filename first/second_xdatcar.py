@@ -12,6 +12,7 @@ mu = 55.8 / 1000
 R = 8.31
 rho = 7800
 gr_discrete = 100
+r_max = 8 * 1e-10
 
 n_timesteps = int((len(data) - 7) / (n_atoms + 1))
 T = []
@@ -26,9 +27,11 @@ for i in range(1, n_timesteps):
                 tmp_rad = 0
                 for index in range(3):
                     tmp_rad += (float(point1[index]) - float(point2[index])) ** 2
-                rads.append(tmp_rad ** 0.5)
+                tmp_rad = tmp_rad ** 0.5 * cell_size[0]
+                if tmp_rad < r_max:
+                    rads.append(tmp_rad)
 
-        dr = 2 / gr_discrete
+        dr = r_max / gr_discrete
         rs = [dr * i for i in range(gr_discrete + 1)]
         ns = [0 for _ in range(gr_discrete + 1)]
         for q in rads:
