@@ -20,26 +20,29 @@ for i in range(1, n_timesteps):
     velocities = [0 for _ in range(n_atoms)]
     if i == 1 or i == n_timesteps - 1:
         rads = []
-        for k in range(n_atoms - 1):
+        for k in range(n_atoms):
             point1 = data[7 + i * (n_atoms + 1) + 1 + k].strip().split()
-            for q in range(k + 1, n_atoms):
-                point2 = data[7 + i * (n_atoms + 1) + 1 + q].strip().split()
-                tmp_rad = 0
-                for index in range(3):
-                    tmp_rad += (float(point1[index]) - float(point2[index])) ** 2
-                tmp_rad = tmp_rad ** 0.5 * cell_size[0]
-                if tmp_rad < r_max:
-                    rads.append(tmp_rad)
+            for q in range(n_atoms):
+                if k != q:
+                    point2 = data[7 + i * (n_atoms + 1) + 1 + q].strip().split()
+                    tmp_rad = 0
+                    for index in range(3):
+                        tmp_rad += (float(point1[index]) - float(point2[index])) ** 2
+                    tmp_rad = tmp_rad ** 0.5 * cell_size[0]
+                    if tmp_rad < r_max:
+                        rads.append(tmp_rad)
 
-        dr = r_max / gr_discrete
-        rs = [dr * i for i in range(gr_discrete + 1)]
-        ns = [0 for _ in range(gr_discrete + 1)]
+        dr = r_max / (gr_discrete - 1)
+        rs = np.array([dr * i for i in range(1, gr_discrete + 1)])
+        ns = [0 for _ in range(1, gr_discrete + 1)]
         for q in rads:
             ns[int(q / dr)] += 2
         ns = np.array(ns)
-        ns = [ns[i] / 4 / np.pi / rs[i] ** 2 / dr / rho if rs[i] != 0 else ns[i] / 4 / np.pi / dr / rho for i in range(len(ns))]
+        print(ns)
+        # ns = ns / 4 / np.pi / rs ** 2 / dr * cell_size[0] ** 3 / n_atoms / (n_atoms - 1) * 2
+        g = ns * cell_size[0] ** 3 / n_atoms ** 2 / (4 * np.pi * rs ** 2 * dr)
         # plt.plot(np.array(rs) * cell_size[0], ns)
-        plt.plot(np.array(rs), ns)
+        plt.plot(np.array(rs), g)
         plt.show()
 
     for k in range(n_atoms):
