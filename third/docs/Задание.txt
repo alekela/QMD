@@ -1,0 +1,2 @@
+1) Оптимизировать параметры в коде SPH-impat-Fe - GrImpactor, sImpactor (scipy.optimize)
+2) Реализовать двоную фазу для металла - Dyachkov_2020_J._Phys. _Conf._Ser._1556_012032.pdf стр 2, 3 (внутри eos.py)

@@ -38,11 +38,14 @@ for i in range(1, n_timesteps):
         for q in rads:
             ns[int(q / dr)] += 2
         ns = np.array(ns)
-        print(ns)
+        # print(ns)
         # ns = ns / 4 / np.pi / rs ** 2 / dr * cell_size[0] ** 3 / n_atoms / (n_atoms - 1) * 2
         g = ns * cell_size[0] ** 3 / n_atoms ** 2 / (4 * np.pi * rs ** 2 * dr)
         # plt.plot(np.array(rs) * cell_size[0], ns)
         plt.plot(np.array(rs), g)
+        plt.xlabel("r, м")
+        plt.ylabel("g(r)")
+        plt.grid()
         plt.show()
 
     for k in range(n_atoms):
@@ -62,5 +65,8 @@ for i in range(1, n_timesteps):
 
 time = [i * timestep for i in range(1, n_timesteps)]
 plt.plot(time, T)
+plt.xlabel("time, s")
+plt.ylabel("T, K")
+plt.grid()
 plt.show()
 
