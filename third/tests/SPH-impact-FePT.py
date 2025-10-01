@@ -1,15 +1,17 @@
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 
 from simpleSPH.data import field, Storage
 from simpleSPH import particles
-from simpleSPH.eos import Hugoniot
+from simpleSPH.eos import HugoniotTwoPhase
 from simpleSPH.solver import WendlandC2, RiemannSolver, SPHSolver as Solver
 from simpleSPH.stepper import RK1 as Stepper
+from time import time
 from scipy.optimize import minimize
 
 
-def main(c0, Gr, s):
+def main(rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end):
     # Параметры задачи impact
     nelem = 1200  # число ячеек
     LImpactor = 6.3  # мм
@@ -18,26 +20,30 @@ def main(c0, Gr, s):
     materialTarget = 2  # id материала
     RhoImpactor = 7900  # плотность ударника
     RhoTarget = 7900  # плотность мишени
-    С0Impactor = c0  # скорость звука ударник
-    С0Target = c0  # скорость звука мишень
-    GrImpactor = Gr  # параметр Грюнайзена ударника
-    GrTarget = Gr  # параметр Грюнайзена мишени
-    sImpactor = s  # параметр ударной адиабаты ударника
-    sTarget = s  # параметр ударной адиабаты мишени
-    vImpactor = 671  # скорость ударника м/c
+    С0Impactor = 4570  # скорость звука ударник
+    С0Target = 4570  # скорость звука мишень
+    GrImpactor = 2.0  # параметр Грюнайзена ударника
+    GrTarget = 2.0  # параметр Грюнайзена мишени
+    sImpactor = 1.49  # параметр ударной адиабаты ударника
+    sTarget = 1.49  # параметр ударной адиабаты мишени
+    vImpactor = 1150  # скорость ударника м/c
     tend = 4e-3  # время окончания моделирования мс
 
-    impactorEos = Hugoniot(
-        rho0=RhoImpactor,
-        c0=С0Impactor,
-        s=sImpactor,
-        gamma=GrImpactor
+    impactorEos = HugoniotTwoPhase(
+        rho01=7900, rho02=8300,
+        rho12from=rho_alpha_eps_start, rho12to=rho_alpha_eps_end,
+        rho21from=rho_eps_alpha_start, rho21to=rho_eps_alpha_end,
+        c01=4570, c02=4570,
+        s1=1.49, s2=1.40,
+        gamma1=2.0, gamma2=2.0
     )
-    targetEos = Hugoniot(
-        rho0=RhoTarget,
-        c0=С0Target,
-        s=sTarget,
-        gamma=GrTarget
+    targetEos = HugoniotTwoPhase(
+        rho01=7900, rho02=8300,
+        rho12from=rho_alpha_eps_start, rho12to=rho_alpha_eps_end,
+        rho21from=rho_eps_alpha_start, rho21to=rho_eps_alpha_end,
+        c01=4570, c02=4570,
+        s1=1.49, s2=1.40,
+        gamma1=2.0, gamma2=2.0
     )
 
     # начальное распределение плотности
@@ -80,7 +86,8 @@ def main(c0, Gr, s):
             field.soundSpeed,
             field.size,
             field.neibs,
-            field.material
+            field.material,
+            field.phase
         ],
         nneibs=6  # число соседних частиц в списке
     )
@@ -92,6 +99,7 @@ def main(c0, Gr, s):
     elements[field.innerEnergy] = np.zeros_like(elements[field.density])
     elements[field.material] = material0(elements[field.coords])
     elements[field.mass] = elements[field.density] * elements[field.size]
+    elements[field.phase] = np.ones(nelem)  # alpha phase
 
     # функция применяется перед интегрированием - расчет полной энергии
     def before_step(particles):
@@ -107,18 +115,38 @@ def main(c0, Gr, s):
     def model(particles):
         iImpactor = np.where(particles[field.material] == materialImpactor)
         iTarget = np.where(particles[field.material] == materialTarget)
+        particles[field.phase][iImpactor] = impactorEos.phase(particles[field.density][iImpactor],
+                                                              particles[field.innerEnergy][iImpactor],
+                                                              particles[field.phase][iImpactor])
+        particles[field.phase][iTarget] = targetEos.phase(particles[field.density][iTarget],
+                                                          particles[field.innerEnergy][iTarget],
+                                                          particles[field.phase][iTarget])
         particles[field.pressure][iImpactor] = impactorEos.pressure(particles[field.density][iImpactor],
-                                                                    particles[field.innerEnergy][iImpactor])
+                                                                    particles[field.innerEnergy][iImpactor],
+                                                                    particles[field.phase][iImpactor])
         particles[field.soundSpeed][iImpactor] = impactorEos.soundSpeed(particles[field.density][iImpactor],
-                                                                        particles[field.innerEnergy][iImpactor])
+                                                                        particles[field.innerEnergy][iImpactor],
+                                                                        particles[field.phase][iImpactor])
         particles[field.pressure][iTarget] = targetEos.pressure(particles[field.density][iTarget],
-                                                                particles[field.innerEnergy][iTarget])
+                                                                particles[field.innerEnergy][iTarget],
+                                                                particles[field.phase][iTarget])
         particles[field.soundSpeed][iTarget] = targetEos.soundSpeed(particles[field.density][iTarget],
-                                                                    particles[field.innerEnergy][iTarget])
+                                                                    particles[field.innerEnergy][iTarget],
+                                                                    particles[field.phase][iTarget])
+
+    def saveplot(istep):
+        plt.close()
+        fig, ax1 = plt.subplots()
+        ax1.plot(elements.data[field.coords], elements.data[field.density])
+        ax1.set_xlim(-LImpactor, 1.5 * LTarget)
+        ax2 = ax1.twinx()
+
+        ax2.plot(elements.data[field.coords], elements.data[field.phase])
+        plt.savefig("results/%06d.png" % istep)
 
     # SPH решатель, выбираем тип сглаживающего ядра и
     # метод расчета значений на контактном разрыве
-    solver = Solver(contact=RiemannSolver(), kernel=WendlandC2(), smoothing_scale=0.93)
+    solver = Solver(contact=RiemannSolver(), kernel=WendlandC2(), smoothing_scale=0.92)
     # Интегрирование по времени по методу Эйлера
     stepper = Stepper(
         solver=solver,  # решатель для расчета правой части
@@ -137,13 +165,14 @@ def main(c0, Gr, s):
     step = stepper.update(elements)
     # цикл шагов по времени
     while time < tend:
+        # while istep < 2500:
         # используем генератор step
         time = next(step)
         istep += 1
         # if istep % 100 == 0:
-        #    print(istep, time)
+        #     print(istep, time)
+        # saveplot(istep)
         visar.append([time, elements[field.velocity][-1]])
-
     visar = np.array(visar)
     return visar
 
@@ -166,7 +195,7 @@ def loss_func(x_exp, y_exp, x, y):
 
 import matplotlib.pyplot as plt
 
-with open("Experiment_data_1_phase.csv") as f:
+with open("Experiment_data_2_phases.csv") as f:
     title = f.readline()
     data = f.readlines()
 data = list(map(lambda x: x.split(','), data[5:]))
@@ -179,34 +208,52 @@ min_p = 0
 
 def fun(x):
     global iters
-    c0 = x[0]
-    Gr = x[1]
-    s = x[2]
-    visar = main(c0, Gr, s)
+    rho_alpha_eps_start = x[0]
+    rho_alpha_eps_end = x[1]
+    rho_eps_alpha_start = x[2]
+    rho_eps_alpha_end = x[3]
+    visar = main(rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end)
     tvisar = visar[:, 0]
     vvisar = visar[:, 1]
     loss = loss_func(ts_exp, vs_exp, tvisar, vvisar)
     iters += 1
+    with open("Res_2phases.csv", 'a') as f:
+        f.write(f"{x[0]},{x[1]},{x[2]},{x[3]},{loss}\n")
     print("Smth")
     return loss
 
 
 iters = 0
-c0 = 4500
-Gr = 2
-s = 1.1
-#p_opt = minimize(fun, [c0, Gr, s], method='Nelder-Mead', bounds=[(0, 10000), (1, 1000), (0, 5)])
-#c0, Gr, s = p_opt.x
-# Optimal parameters found:
-c0, Gr, s = 4088.9315778510468, 2.853650382898631, 2.851759782222584
+rho_alpha_eps_start = 8400
+rho_alpha_eps_end = 8700
+rho_eps_alpha_start = 8500
+rho_eps_alpha_end = 8300
 
-visar = main(c0, Gr, s)
+with open("Res_2phases.csv", 'w') as f:
+    f.write("rho_alpha_eps_start,rho_alpha_eps_end,rho_eps_alpha_start,rho_eps_alpha_end,loss\n")
+t1 = time()
+p_opt = minimize(fun, [rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end],
+                 bounds=[(8400, 8500), (8650, 8800), (8500, 8650), (8250, 8400)])
+rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end = p_opt.x
+
+# rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end = 8400.0, 8700.0, 8500.0, 8300.0
+
+t2 = time()
+print(p_opt)
+print(f"Optimizing time: {t2 - t1}")
+
+t1 = time()
+visar = main(rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end)
 tvisar = visar[:, 0]
 vvisar = visar[:, 1]
 loss = loss_func(ts_exp, vs_exp, tvisar, vvisar)
+t2 = time()
+print(f"One iter time: {t2 - t1}")
 
-print(f"Found optimal c0 = {c0}, Gr = {Gr}, s = {s} with loss {loss}")
+print(
+    f"Found optimal rho_alpha_eps_start = {rho_alpha_eps_start}, rho_alpha_eps_end = {rho_alpha_eps_end}, rho_eps_alpha_start = {rho_eps_alpha_start}, rho_eps_alpha_end = {rho_eps_alpha_end} with loss {loss}")
 print(f"Iters = {iters}")
+print("True parameters: rho12from = 8440, rho12to = 8717, rho21from = 8550, rho21to = 8312")
 # строим график для плотности
 # plt.plot(elements.data[field.coords], elements.data[field.velocity])
 # plt.xlim(-LImpactor, 1.5*LTarget)

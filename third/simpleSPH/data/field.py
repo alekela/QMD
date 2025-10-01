@@ -7,6 +7,7 @@ densityDerivative = "densityDerivative"
 size              = "size"
 element           = "element"
 material          = "material"
+phase             = "phase"
 mass              = "mass"
 energy            = "energy"
 innerEnergy       = "innerEnergy"
@@ -34,6 +35,7 @@ fields_dtype = {
     size:              np.float64,
     element:           "20S",
     material:          np.int64,
+    phase:             np.int64,
     mass:              np.float64,
     energy:            np.float64,
     innerEnergy:       np.float64,
@@ -56,6 +58,7 @@ fields_list = [
     size,
     element,
     material,
+    phase,
     mass,
     energy,
     innerEnergy,

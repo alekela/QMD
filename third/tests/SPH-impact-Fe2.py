@@ -1,50 +1,44 @@
 import math
 import numpy as np
+from time import time
 
 from simpleSPH.data import field, Storage
 from simpleSPH import particles
-from simpleSPH.eos import Hugoniot
+from simpleSPH.eos import Hugoniot, Hugoniot2
 from simpleSPH.solver import WendlandC2, RiemannSolver, SPHSolver as Solver
 from simpleSPH.stepper import RK1 as Stepper
 from scipy.optimize import minimize
 
 
-def main(c0, Gr, s):
+def main(rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end):
     # Параметры задачи impact
     nelem = 1200  # число ячеек
     LImpactor = 6.3  # мм
     LTarget = 6.3  # мм
     materialImpactor = 1  # id материала
     materialTarget = 2  # id материала
-    RhoImpactor = 7900  # плотность ударника
-    RhoTarget = 7900  # плотность мишени
-    С0Impactor = c0  # скорость звука ударник
-    С0Target = c0  # скорость звука мишень
-    GrImpactor = Gr  # параметр Грюнайзена ударника
-    GrTarget = Gr  # параметр Грюнайзена мишени
-    sImpactor = s  # параметр ударной адиабаты ударника
-    sTarget = s  # параметр ударной адиабаты мишени
+    RhoImpactor_alpha = 7900  # плотность ударника
+    RhoImpactor_eps = 8300  # плотность ударника
+    RhoTarget_alpha = 7900  # плотность мишени
+    RhoTarget_eps = 8300  # плотность мишени
+    С0Impactor_alpha = 4570  # скорость звука ударник
+    С0Impactor_eps = 4570  # скорость звука ударник
+    С0Target_alpha = 4570  # скорость звука мишень
+    С0Target_eps = 4570  # скорость звука мишень
+    GrImpactor = 2  # параметр Грюнайзена ударника
+    GrTarget = 2  # параметр Грюнайзена мишени
+    sImpactor_alpha = 1.49  # параметр ударной адиабаты ударника
+    sImpactor_eps = 1.4  # параметр ударной адиабаты ударника
+    sTarget_alpha = 1.49  # параметр ударной адиабаты мишени
+    sTarget_eps = 1.4  # параметр ударной адиабаты мишени
     vImpactor = 671  # скорость ударника м/c
     tend = 4e-3  # время окончания моделирования мс
-
-    impactorEos = Hugoniot(
-        rho0=RhoImpactor,
-        c0=С0Impactor,
-        s=sImpactor,
-        gamma=GrImpactor
-    )
-    targetEos = Hugoniot(
-        rho0=RhoTarget,
-        c0=С0Target,
-        s=sTarget,
-        gamma=GrTarget
-    )
 
     # начальное распределение плотности
     def density0(x):
         rho = np.zeros_like(x)
-        rho[x < 0] = RhoImpactor
-        rho[x >= 0] = RhoTarget
+        rho[x < 0] = RhoImpactor_alpha
+        rho[x >= 0] = RhoTarget_alpha
         return rho
 
     def material0(x):
@@ -92,6 +86,54 @@ def main(c0, Gr, s):
     elements[field.innerEnergy] = np.zeros_like(elements[field.density])
     elements[field.material] = material0(elements[field.coords])
     elements[field.mass] = elements[field.density] * elements[field.size]
+    iImpactor = np.where(elements[field.material] == materialImpactor)
+    iTarget = np.where(elements[field.material] == materialTarget)
+
+    phase_alpha = np.array(['a' for _ in range(len(elements[field.density]))])
+    phase_alpha_impactor = phase_alpha[iImpactor]
+    phase_alpha_target = phase_alpha[iTarget]
+
+    # impactorEos = Hugoniot2(
+    #     gamma=GrImpactor,
+    #     rho10=RhoImpactor_alpha,
+    #     c10=С0Impactor_alpha,
+    #     s1=sImpactor_alpha,
+    #     rho20=RhoImpactor_eps,
+    #     c20=С0Impactor_eps,
+    #     s2=sImpactor_eps,
+    #     curr_phase=phase_alpha_impactor,
+    #     rhoae_start=rho_alpha_eps_start,
+    #     rhoae_end=rho_alpha_eps_end,
+    #     rhoea_start=rho_eps_alpha_start,
+    #     rhoea_end=rho_eps_alpha_end
+    # )
+    #
+    # targetEos = Hugoniot2(
+    #     gamma=GrImpactor,
+    #     rho10=RhoImpactor_alpha,
+    #     c10=С0Impactor_alpha,
+    #     s1=sImpactor_alpha,
+    #     rho20=RhoImpactor_eps,
+    #     c20=С0Impactor_eps,
+    #     s2=sImpactor_eps,
+    #     curr_phase=phase_alpha_target,
+    #     rhoae_start=rho_alpha_eps_start,
+    #     rhoae_end=rho_alpha_eps_end,
+    #     rhoea_start=rho_eps_alpha_start,
+    #     rhoea_end=rho_eps_alpha_end
+    # )
+    impactorEos = Hugoniot(
+        rho0=RhoImpactor_alpha,
+        c0=С0Impactor_alpha,
+        s=sImpactor_alpha,
+        gamma=GrImpactor
+    )
+    targetEos = Hugoniot(
+        rho0=RhoImpactor_alpha,
+        c0=С0Impactor_alpha,
+        s=sImpactor_alpha,
+        gamma=GrTarget
+    )
 
     # функция применяется перед интегрированием - расчет полной энергии
     def before_step(particles):
@@ -166,7 +208,7 @@ def loss_func(x_exp, y_exp, x, y):
 
 import matplotlib.pyplot as plt
 
-with open("Experiment_data_1_phase.csv") as f:
+with open("Experiment_data_2_phases.csv") as f:
     title = f.readline()
     data = f.readlines()
 data = list(map(lambda x: x.split(','), data[5:]))
@@ -179,32 +221,45 @@ min_p = 0
 
 def fun(x):
     global iters
-    c0 = x[0]
-    Gr = x[1]
-    s = x[2]
-    visar = main(c0, Gr, s)
+    rho_alpha_eps_start = x[0]
+    rho_alpha_eps_end = x[1]
+    rho_eps_alpha_start = x[2]
+    rho_eps_alpha_end = x[3]
+    visar = main(rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end)
     tvisar = visar[:, 0]
     vvisar = visar[:, 1]
     loss = loss_func(ts_exp, vs_exp, tvisar, vvisar)
     iters += 1
+    with open("Res_2phases_my.csv", 'a') as f:
+        f.write(f"{x[0]},{x[1]},{x[2]},{x[3]},{loss}\n")
     print("Smth")
     return loss
 
 
 iters = 0
-c0 = 4500
-Gr = 2
-s = 1.1
-p_opt = minimize(fun, [c0, Gr, s], method='Nelder-Mead', bounds=[(0, 10000), (1, 1000), (0, 5)])
-c0, Gr, s = p_opt.x
-# c0, Gr, s = 4081.8668677413934, -1.0096265620189018, 2.8909381001613594
+rho_alpha_eps_start = 8400
+rho_alpha_eps_end = 8700
+rho_eps_alpha_start = 8500
+rho_eps_alpha_end = 8300
+with open("Res_2phases_my.csv", 'w') as f:
+    f.write("rho_alpha_eps_start,rho_alpha_eps_end,rho_eps_alpha_start,rho_eps_alpha_end,loss\n")
+t1 = time()
+p_opt = minimize(fun, [rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end])
+rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end = p_opt.x
 
-visar = main(c0, Gr, s)
+t2 = time()
+print(p_opt)
+print(f"Optimizing time: {t2 - t1}")
+
+t1 = time()
+visar = main(rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end)
 tvisar = visar[:, 0]
 vvisar = visar[:, 1]
 loss = loss_func(ts_exp, vs_exp, tvisar, vvisar)
+t2 = time()
+print(f"One iter time: {t2 - t1}")
 
-print(f"Found optimal c0 = {c0}, Gr = {Gr}, s = {s} with loss {loss}")
+print(f"Found optimal rho_alpha_eps_start = {rho_alpha_eps_start}, rho_alpha_eps_end = {rho_alpha_eps_end}, rho_eps_alpha_start = {rho_eps_alpha_start}, rho_eps_alpha_end = {rho_eps_alpha_end} with loss {loss}")
 print(f"Iters = {iters}")
 # строим график для плотности
 # plt.plot(elements.data[field.coords], elements.data[field.velocity])
