@@ -232,14 +232,14 @@ rho_eps_alpha_end = 8300
 with open("Res_2phases.csv", 'w') as f:
     f.write("rho_alpha_eps_start,rho_alpha_eps_end,rho_eps_alpha_start,rho_eps_alpha_end,loss\n")
 t1 = time()
-p_opt = minimize(fun, [rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end],
-                 bounds=[(8400, 8500), (8650, 8800), (8500, 8650), (8250, 8400)])
-rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end = p_opt.x
+# p_opt = minimize(fun, [rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end],
+#                  bounds=[(8400, 8500), (8650, 8800), (8500, 8650), (8250, 8400)])
+# rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end = p_opt.x
+# print(p_opt)
 
-# rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end = 8400.0, 8700.0, 8500.0, 8300.0
+rho_alpha_eps_start, rho_alpha_eps_end, rho_eps_alpha_start, rho_eps_alpha_end = 8400.0, 8700.0, 8500.0, 8300.0
 
 t2 = time()
-print(p_opt)
 print(f"Optimizing time: {t2 - t1}")
 
 t1 = time()

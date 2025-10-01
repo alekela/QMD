@@ -188,6 +188,9 @@ def fun(x):
     loss = loss_func(ts_exp, vs_exp, tvisar, vvisar)
     iters += 1
     print("Smth")
+    with open("Res_1phase.csv", 'a') as f:
+        f.write(f"{x[0]},{x[1]},{x[2]},{x[3]},{loss}\n")
+    print("Smth")
     return loss
 
 
@@ -195,6 +198,8 @@ iters = 0
 c0 = 4500
 Gr = 2
 s = 1.1
+with open("Res_1phase.csv", 'w') as f:
+    f.write("rho_alpha_eps_start,rho_alpha_eps_end,rho_eps_alpha_start,rho_eps_alpha_end,loss\n")
 #p_opt = minimize(fun, [c0, Gr, s], method='Nelder-Mead', bounds=[(0, 10000), (1, 1000), (0, 5)])
 #c0, Gr, s = p_opt.x
 # Optimal parameters found:
